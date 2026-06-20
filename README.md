@@ -36,11 +36,11 @@ A kind of event store, keeps metadata on groups of messages from a stream.
   es,
   ms,
   js,
-  parti.WithSubjectSuffix("my.tenant"), // Metadata will be stored under my.tenant.parti_meta...
+  parti.WithSubjectPrefix("my.tenant"), // Metadata will be stored under my.tenant.parti_meta...
  )
 
  // Subscriber consumes the EVENT_STREAM, groups messages by their 3rd part of the subject into an easily retrievable log
- go p.Subscribe(ctx, parti.WildcardPartition(3))
+ go p.Subscribe(ctx, parti.SubjectPartition(3))
 
  // Input
  // eg. my.tenant123.some_entity123.created

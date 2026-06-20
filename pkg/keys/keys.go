@@ -28,26 +28,6 @@ var (
 
 type Opt func(*Keys)
 
-func ex(
-	ctx context.Context,
-	aesKey []byte,
-	stream jetstream.Stream,
-	js jetstream.JetStream,
-) {
-	k := New(
-		stream,
-		js,
-		WithEncryptionKey(aesKey),          // Encrypts all messages
-		WithSubjectPrefix("my.tenant_123"), // Will ensure all messages are stored in a particular subject space
-	)
-
-	_ = k.SetKey(ctx, "my_secret", "1245")
-	_ = k.SetExpiringKey(ctx, "my_secret_2", "54321", 3*time.Hour) // TTL reqires AllowMsgTTL on the stream
-
-	value, _ := k.GetKey(ctx, "my_secret")
-	_ = k.DelKey(ctx, "my_secret")
-}
-
 func New(
 	stream jetstream.Stream,
 	js jetstream.JetStream,
