@@ -53,8 +53,7 @@ A kind of event store, keeps metadata on groups of messages from a stream.
 
 
  // Getting messages costs O(n+1)
- // Can be sped up by caching, and parallelism
- iter, _ := p.Get(ctx, "some_entity123", parti.GetInParallel(), parti.GetWithCache())
+ iter, _ := p.Get(ctx, "some_entity123")
  for msg, err := range iter {
     if errors.Is(parti.ErrRetrievalFailed){
      break
@@ -62,6 +61,8 @@ A kind of event store, keeps metadata on groups of messages from a stream.
 
    // Do stuff with messages
  }
+
+ _ = p.Del(ctx, "some_entity123") // Soft delete the entity, retaining metadata and messages
 
 
 ```
