@@ -1,4 +1,4 @@
-module github.com/dominikbb/js-ters/parti
+module github.com/dominikbb/js-ters/pkg/parti
 
 go 1.25.7
 

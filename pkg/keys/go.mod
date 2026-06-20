@@ -1,4 +1,4 @@
-module github.com/dominikbb/js-ters/keys
+module github.com/dominikbb/js-ters/pkg/keys
 
 go 1.25.7
 
