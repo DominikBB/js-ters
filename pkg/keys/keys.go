@@ -28,6 +28,26 @@ var (
 
 type Opt func(*Keys)
 
+func ex(
+	ctx context.Context,
+	aesKey []byte,
+	stream jetstream.Stream,
+	js jetstream.JetStream,
+) {
+	k := New(
+		stream,
+		js,
+		WithEncryptionKey(aesKey),          // Encrypts all messages
+		WithSubjectPrefix("my.tenant_123"), // Will ensure all messages are stored in a particular subject space
+	)
+
+	_ = k.SetKey(ctx, "my_secret", "1245")
+	_ = k.SetExpiringKey(ctx, "my_secret_2", "54321", 3*time.Hour) // TTL reqires AllowMsgTTL on the stream
+
+	value, _ := k.GetKey(ctx, "my_secret")
+	_ = k.DelKey(ctx, "my_secret")
+}
+
 func New(
 	stream jetstream.Stream,
 	js jetstream.JetStream,
@@ -40,7 +60,7 @@ func New(
 	return &i
 }
 
-func WithSubjectSuffix(s string) Opt {
+func WithSubjectPrefix(s string) Opt {
 	return func(i *Keys) {
 		i.tenantID = s
 	}
@@ -55,7 +75,7 @@ func WithEncryptionKey(k []byte) Opt {
 	}
 }
 
-func (s *Keys) SetKey(ctx context.Context, key string, val any, ttl *time.Duration) error {
+func (s *Keys) SetKey(ctx context.Context, key string, val any) error {
 	if key == "" {
 		return fmt.Errorf("%w - cannot set empty key", ErrBadInput)
 	}
@@ -63,12 +83,6 @@ func (s *Keys) SetKey(ctx context.Context, key string, val any, ttl *time.Durati
 	data, err := json.Marshal(val)
 	if err != nil {
 		return fmt.Errorf("%w - marshaling failed: %w", ErrBadInput, err)
-	}
-
-	opts := []jetstream.PublishOpt{}
-
-	if ttl != nil {
-		opts = append(opts, jetstream.WithMsgTTL(*ttl))
 	}
 
 	if len(s.cryptoKey) > 0 {
@@ -82,7 +96,33 @@ func (s *Keys) SetKey(ctx context.Context, key string, val any, ttl *time.Durati
 		ctx,
 		s.InTenantSubjectSpace(fmt.Sprintf("keys.%s", key)),
 		data,
-		opts...,
+	)
+
+	return err
+}
+
+func (s *Keys) SetExpiringKey(ctx context.Context, key string, val any, ttl time.Duration) error {
+	if key == "" {
+		return fmt.Errorf("%w - cannot set empty key", ErrBadInput)
+	}
+
+	data, err := json.Marshal(val)
+	if err != nil {
+		return fmt.Errorf("%w - marshaling failed: %w", ErrBadInput, err)
+	}
+
+	if len(s.cryptoKey) > 0 {
+		data, err = s.encrypt(data)
+		if err != nil {
+			return fmt.Errorf("encryption failed: %w", err)
+		}
+	}
+
+	_, err = s.js.Publish(
+		ctx,
+		s.InTenantSubjectSpace(fmt.Sprintf("keys.%s", key)),
+		data,
+		jetstream.WithMsgTTL(ttl),
 	)
 
 	return err
