@@ -38,7 +38,7 @@ func New(
 	js jetstream.JetStream,
 	opts ...Opt,
 ) *Parti {
-	es := Parti{dataStream: dataStream, js: js}
+	es := Parti{metadataStream: metadataStream, dataStream: dataStream, js: js}
 	for _, opt := range opts {
 		opt(&es)
 	}
