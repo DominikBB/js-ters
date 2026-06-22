@@ -16,7 +16,7 @@ import (
 type Parti struct {
 	subPrefix      string // A subject which will be used as suffix to all eventstore stream operations
 	metadataStream jetstream.Stream
-	eventStream    jetstream.Stream
+	dataStream     jetstream.Stream
 	js             jetstream.JetStream
 }
 
@@ -28,12 +28,17 @@ var (
 	ErrNotFound  = errors.New("not found")
 )
 
-func NewEventStore(
-	eventStream jetstream.Stream,
+// New sets up a new Parti instance
+//
+// the metadataStream is where the partition metadata is stored, it can have MaxMsgsPerSubject and does not need to be HA
+// the dataStream is where you keep the concrete messages, this should be a HA, append only persisted stream
+func New(
+	metadataStream jetstream.Stream,
+	dataStream jetstream.Stream,
 	js jetstream.JetStream,
 	opts ...Opt,
 ) *Parti {
-	es := Parti{eventStream: eventStream, js: js}
+	es := Parti{dataStream: dataStream, js: js}
 	for _, opt := range opts {
 		opt(&es)
 	}
@@ -45,12 +50,6 @@ func NewEventStore(
 func WithSubjectPrefix(s string) Opt {
 	return func(es *Parti) {
 		es.subPrefix = s
-	}
-}
-
-func WithMetadataStream(s jetstream.Stream) Opt {
-	return func(es *Parti) {
-		es.metadataStream = s
 	}
 }
 
@@ -158,15 +157,17 @@ func (s *Parti) Subscribe(ctx context.Context, cons jetstream.Consumer, strategy
 		if ctx.Err() != nil {
 			return nil
 		}
+		ctx, cancel := context.WithDeadline(ctx, time.Now().Add(5*time.Second))
 
 		batch, err := cons.Fetch(
 			300,
 			jetstream.FetchContext(ctx),
-			jetstream.FetchMaxWait(5*time.Second),
 		)
 		if err != nil {
+			cancel()
 			return err
 		}
+		cancel()
 
 		groups := map[string][]jetstream.Msg{}
 		for m := range batch.Messages() {
@@ -275,7 +276,7 @@ func (s *Parti) iterateOver(ctx context.Context, agg Aggregate) iter.Seq2[*jetst
 	return func(yield func(*jetstream.RawStreamMsg, error) bool) {
 		for _, seq := range agg.Events {
 
-			msg, err := s.eventStream.GetMsg(ctx, seq)
+			msg, err := s.dataStream.GetMsg(ctx, seq)
 			if err != nil {
 				if !yield(msg, err) {
 					return
